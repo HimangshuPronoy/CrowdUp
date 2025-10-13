@@ -80,11 +80,16 @@ Visit http://localhost:3000
 
 ## Supabase Configuration
 
-### Enable Email Confirmation (Optional)
+### Disable Email Confirmation (Recommended for Development)
 
 1. Go to **Authentication** > **Settings** in Supabase
-2. Under **Email Auth**, toggle **Enable email confirmations**
-3. Configure your email templates
+2. Under **Email Auth**, find **"Enable email confirmations"**
+3. **Turn it OFF** (disable it)
+4. Click **Save**
+
+This allows users to sign up and use the app immediately without email verification.
+
+For production, you may want to enable this for security.
 
 ### Authentication Providers (Optional)
 

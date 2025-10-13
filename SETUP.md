@@ -14,10 +14,13 @@
 
 5. Click **Run** to execute the SQL script
 
+6. **Important**: Run `supabase-auth-trigger.sql` to set up automatic profile creation
+
 This will create:
 - All necessary tables (profiles, companies, posts, votes, comments, follows)
 - Row Level Security (RLS) policies
 - Database triggers for vote/comment counts
+- Automatic profile creation on signup
 - Sample companies (Instagram, WhatsApp, Spotify, Discord, Netflix, Twitter)
 
 ### 2. Environment Variables

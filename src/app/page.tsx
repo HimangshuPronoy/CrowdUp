@@ -6,6 +6,7 @@ import PostCard from "@/components/PostCard";
 import Sidebar from "@/components/Sidebar";
 import FilterBar from "@/components/FilterBar";
 import SidePanel from "@/components/SidePanel";
+import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 import { Post } from "@/types/database";
 import { formatDistanceToNow } from "date-fns";

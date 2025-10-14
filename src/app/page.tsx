@@ -123,6 +123,7 @@ export default function Home() {
                   authorInitial={post.profiles?.full_name?.[0] || post.profiles?.username?.[0] || "A"}
                   timestamp={formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
                   comments={post.comments_count}
+                  images={(post as any).images}
                 />
               ))
             )}

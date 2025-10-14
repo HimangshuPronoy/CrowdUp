@@ -23,6 +23,7 @@ interface PostCardProps {
   timestamp: string;
   comments: number;
   postId?: string;
+  images?: string[] | null;
 }
 
 export default function PostCard({
@@ -37,6 +38,7 @@ export default function PostCard({
   timestamp,
   comments,
   postId = "1",
+  images,
 }: PostCardProps) {
   const router = useRouter();
   const { user } = useAuth();
@@ -271,6 +273,42 @@ export default function PostCard({
 
           <h3 className="text-lg font-semibold mb-2 hover:text-orange-500 transition-colors">{title}</h3>
           <p className="text-sm text-gray-600 mb-4 line-clamp-2">{description}</p>
+
+          {/* Images */}
+          {images && images.length > 0 && (
+            <div className={cn(
+              "grid gap-2 mb-4",
+              images.length === 1 && "grid-cols-1",
+              images.length === 2 && "grid-cols-2",
+              images.length >= 3 && "grid-cols-2"
+            )}>
+              {images.slice(0, 4).map((image, index) => (
+                <div
+                  key={index}
+                  className={cn(
+                    "relative overflow-hidden rounded-lg",
+                    images.length === 1 && "h-48",
+                    images.length >= 2 && "h-32"
+                  )}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // Could open lightbox here
+                  }}
+                >
+                  <img
+                    src={image}
+                    alt={`Post image ${index + 1}`}
+                    className="w-full h-full object-cover hover:scale-105 transition-transform cursor-pointer"
+                  />
+                  {index === 3 && images.length > 4 && (
+                    <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center text-white font-bold">
+                      +{images.length - 4}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Footer */}
           <div className="flex items-center justify-between">

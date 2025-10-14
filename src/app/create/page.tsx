@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/select";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Send } from "lucide-react";
+import { Send, Image as ImageIcon, X } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
@@ -25,6 +25,9 @@ export default function CreatePostPage() {
   const { user } = useAuth();
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [images, setImages] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [formData, setFormData] = useState({
     type: "",
     company: "",
@@ -50,6 +53,77 @@ export default function CreatePostPage() {
     if (data) setCompanies(data);
   };
 
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    
+    if (files.length + images.length > 4) {
+      toast.error("Maximum 4 images allowed");
+      return;
+    }
+
+    // Validate file sizes (max 5MB each)
+    const validFiles = files.filter(file => {
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error(`${file.name} is too large (max 5MB)`);
+        return false;
+      }
+      return true;
+    });
+
+    setImages([...images, ...validFiles]);
+
+    // Create previews
+    validFiles.forEach(file => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreviews(prev => [...prev, reader.result as string]);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const removeImage = (index: number) => {
+    setImages(images.filter((_, i) => i !== index));
+    setImagePreviews(imagePreviews.filter((_, i) => i !== index));
+  };
+
+  const uploadImages = async (): Promise<string[]> => {
+    if (images.length === 0) return [];
+
+    setUploading(true);
+    const uploadedUrls: string[] = [];
+
+    try {
+      for (const image of images) {
+        const fileExt = image.name.split('.').pop();
+        const fileName = `${user!.id}-${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+        const filePath = `${fileName}`;
+
+        const { error: uploadError, data } = await supabase.storage
+          .from('post-images')
+          .upload(filePath, image, {
+            cacheControl: '3600',
+            upsert: false
+          });
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('post-images')
+          .getPublicUrl(filePath);
+
+        uploadedUrls.push(publicUrl);
+      }
+
+      return uploadedUrls;
+    } catch (error) {
+      console.error('Error uploading images:', error);
+      throw error;
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -66,6 +140,9 @@ export default function CreatePostPage() {
     setLoading(true);
 
     try {
+      // Upload images first
+      const imageUrls = await uploadImages();
+
       const typeMap: Record<string, string> = {
         bug: "Bug Report",
         feature: "Feature Request",
@@ -80,6 +157,7 @@ export default function CreatePostPage() {
           type: typeMap[formData.type],
           title: formData.title,
           description: formData.description,
+          images: imageUrls.length > 0 ? imageUrls : null,
         });
 
       if (error) throw error;
@@ -167,15 +245,71 @@ export default function CreatePostPage() {
               />
             </div>
 
+            {/* Images */}
+            <div>
+              <Label className="text-base font-semibold mb-2 block">
+                Images (Optional)
+              </Label>
+              <div className="space-y-3">
+                {/* Image Previews */}
+                {imagePreviews.length > 0 && (
+                  <div className="grid grid-cols-2 gap-3">
+                    {imagePreviews.map((preview, index) => (
+                      <div key={index} className="relative group">
+                        <img
+                          src={preview}
+                          alt={`Preview ${index + 1}`}
+                          className="w-full h-32 object-cover rounded-lg border"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeImage(index)}
+                          className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Upload Button */}
+                {images.length < 4 && (
+                  <div>
+                    <input
+                      type="file"
+                      id="images"
+                      accept="image/*"
+                      multiple
+                      onChange={handleImageChange}
+                      className="hidden"
+                    />
+                    <label
+                      htmlFor="images"
+                      className="flex items-center justify-center gap-2 h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-orange-500 hover:bg-orange-50 transition-all"
+                    >
+                      <ImageIcon className="h-6 w-6 text-gray-400" />
+                      <span className="text-sm text-gray-600">
+                        Add images ({images.length}/4)
+                      </span>
+                    </label>
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                Maximum 4 images, 5MB each. Supported: JPG, PNG, GIF, WebP
+              </p>
+            </div>
+
             {/* Actions */}
             <div className="flex items-center gap-3 pt-4">
               <Button
                 type="submit"
                 className="flex-1 h-12 bg-orange-500 hover:bg-orange-600 gap-2"
-                disabled={loading}
+                disabled={loading || uploading}
               >
                 <Send className="h-4 w-4" />
-                {loading ? "Publishing..." : "Publish Post"}
+                {uploading ? "Uploading images..." : loading ? "Publishing..." : "Publish Post"}
               </Button>
               <Button
                 type="button"

@@ -8,7 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
-import { Filter, TrendingUp, Clock, MessageSquare } from "lucide-react";
+import { Filter, TrendingUp, Clock, MessageSquare, Flame, Zap } from "lucide-react";
 
 interface FilterBarProps {
   selectedType: string;
@@ -49,22 +49,34 @@ export default function FilterBar({
           <SelectValue placeholder="Sort by" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="recent">
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4" />
-              Most Recent
-            </div>
-          </SelectItem>
           <SelectItem value="popular">
             <div className="flex items-center gap-2">
               <TrendingUp className="h-4 w-4" />
-              Most Popular
+              Best (Smart Feed)
+            </div>
+          </SelectItem>
+          <SelectItem value="hot">
+            <div className="flex items-center gap-2">
+              <Flame className="h-4 w-4" />
+              Hot (Viral)
+            </div>
+          </SelectItem>
+          <SelectItem value="recent">
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4" />
+              New
             </div>
           </SelectItem>
           <SelectItem value="discussed">
             <div className="flex items-center gap-2">
               <MessageSquare className="h-4 w-4" />
               Most Discussed
+            </div>
+          </SelectItem>
+          <SelectItem value="controversial">
+            <div className="flex items-center gap-2">
+              <Zap className="h-4 w-4" />
+              Controversial
             </div>
           </SelectItem>
         </SelectContent>

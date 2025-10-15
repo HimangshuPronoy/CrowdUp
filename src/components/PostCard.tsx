@@ -10,6 +10,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
+import { usePostView } from "@/hooks/usePostView";
 
 interface PostCardProps {
   type: "Bug Report" | "Feature Request" | "Complaint";
@@ -46,6 +47,8 @@ export default function PostCard({
   const [userVote, setUserVote] = useState<"up" | "down" | null>(null);
   const [loading, setLoading] = useState(false);
   const [isBookmarked, setIsBookmarked] = useState(false);
+
+  const { trackClick } = usePostView(postId);
 
   useEffect(() => {
     if (user) {
@@ -203,6 +206,7 @@ export default function PostCard({
   };
 
   const handlePostClick = () => {
+    trackClick();
     router.push(`/post/${postId}`);
   };
 

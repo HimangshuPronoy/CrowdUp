@@ -15,7 +15,7 @@ export default function Home() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedType, setSelectedType] = useState("all");
-  const [selectedSort, setSelectedSort] = useState("recent");
+  const [selectedSort, setSelectedSort] = useState("popular");
 
   useEffect(() => {
     fetchPosts();
@@ -37,16 +37,26 @@ export default function Home() {
         query = query.eq('type', selectedType);
       }
 
-      // Apply sorting
+      // Apply sorting with engagement algorithm
       switch (selectedSort) {
         case "popular":
-          query = query.order('votes_count', { ascending: false });
+          // Use engagement score for intelligent ranking
+          query = query.order('engagement_score', { ascending: false, nullsFirst: false });
           break;
         case "discussed":
           query = query.order('comments_count', { ascending: false });
           break;
+        case "hot":
+          // Viral content: high engagement + recency
+          query = query.order('virality_score', { ascending: false, nullsFirst: false });
+          break;
+        case "controversial":
+          // Controversial posts
+          query = query.order('controversy_score', { ascending: false, nullsFirst: false });
+          break;
         default:
-          query = query.order('created_at', { ascending: false });
+          // Smart feed: balance of engagement and recency
+          query = query.order('engagement_score', { ascending: false, nullsFirst: false });
       }
 
       query = query.limit(20);

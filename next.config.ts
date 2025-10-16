@@ -16,19 +16,26 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  outputFileTracingRoot: path.resolve(__dirname, '../../'),
+  // outputFileTracingRoot: path.resolve(__dirname, '../../'),
   typescript: {
     ignoreBuildErrors: true,
   },
   eslint: {
     ignoreDuringBuilds: true,
   },
-  turbopack: {
-    rules: {
-      "*.{jsx,tsx}": {
-        loaders: [LOADER]
+  // Disable turbopack for production builds
+  ...(process.env.NODE_ENV === 'production' ? {} : {
+    turbopack: {
+      rules: {
+        "*.{jsx,tsx}": {
+          loaders: [LOADER]
+        }
       }
     }
+  }),
+  // Optimize for Vercel
+  experimental: {
+    optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],
   }
 };
 

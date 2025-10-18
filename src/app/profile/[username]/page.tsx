@@ -29,13 +29,18 @@ export default function ProfilePage() {
 
   const fetchProfile = async () => {
     try {
+      console.log('Fetching profile for username:', params.username);
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('username', params.username)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Profile fetch error:', error);
+        throw error;
+      }
+      console.log('Profile found:', data);
       setProfile(data);
     } catch (error) {
       console.error('Error fetching profile:', error);
@@ -90,7 +95,16 @@ export default function ProfilePage() {
         <Header />
         <main className="mx-auto max-w-5xl px-6 pt-24 pb-8">
           <div className="text-center py-12 bg-white rounded-lg border">
-            <p className="text-gray-600">User not found</p>
+            <p className="text-gray-600 mb-4">User "@{params.username}" not found</p>
+            <p className="text-sm text-gray-500 mb-4">
+              This user may not exist or their profile hasn't been set up yet.
+            </p>
+            <Button
+              onClick={() => window.location.href = '/'}
+              className="bg-orange-500 hover:bg-orange-600"
+            >
+              Back to Home
+            </Button>
           </div>
         </main>
       </div>

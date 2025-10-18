@@ -31,6 +31,11 @@ export default function SettingsPage() {
       return;
     }
 
+    // Always set loading to false after a short delay
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 2000);
+
     if (profile) {
       setFormData({
         username: profile.username || "",
@@ -38,20 +43,11 @@ export default function SettingsPage() {
         bio: profile.bio || "",
       });
       setLoading(false);
+      clearTimeout(timer);
     }
-  }, [user, profile]);
-
-  useEffect(() => {
-    // Timeout to prevent infinite loading
-    const timer = setTimeout(() => {
-      if (!profile && user) {
-        setLoading(false);
-        toast.error("Profile not found. Please try refreshing.");
-      }
-    }, 5000);
 
     return () => clearTimeout(timer);
-  }, [profile, user]);
+  }, [user, profile, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

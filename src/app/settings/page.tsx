@@ -16,7 +16,8 @@ import { User, Bell, Shield, Trash2 } from "lucide-react";
 export default function SettingsPage() {
   const router = useRouter();
   const { user, profile } = useAuth();
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
     username: "",
     fullName: "",
@@ -36,14 +37,27 @@ export default function SettingsPage() {
         fullName: profile.full_name || "",
         bio: profile.bio || "",
       });
+      setLoading(false);
     }
   }, [user, profile]);
+
+  useEffect(() => {
+    // Timeout to prevent infinite loading
+    const timer = setTimeout(() => {
+      if (!profile && user) {
+        setLoading(false);
+        toast.error("Profile not found. Please try refreshing.");
+      }
+    }, 5000);
+
+    return () => clearTimeout(timer);
+  }, [profile, user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
 
-    setLoading(true);
+    setSaving(true);
     try {
       const { error } = await supabase
         .from('profiles')
@@ -57,25 +71,29 @@ export default function SettingsPage() {
       if (error) throw error;
 
       toast.success("Profile updated successfully!");
-      window.location.reload();
+      setTimeout(() => window.location.reload(), 1000);
     } catch (error: any) {
       toast.error(error.message || "Failed to update profile");
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
-  if (!user || !profile) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
         <Header />
         <main className="mx-auto max-w-4xl px-6 pt-24 pb-8">
           <div className="text-center py-12 bg-white rounded-lg border">
-            <p className="text-gray-600">Loading...</p>
+            <p className="text-gray-600">Loading profile...</p>
           </div>
         </main>
       </div>
     );
+  }
+
+  if (!user) {
+    return null;
   }
 
   return (
@@ -144,10 +162,10 @@ export default function SettingsPage() {
 
               <Button
                 type="submit"
-                disabled={loading}
+                disabled={saving}
                 className="bg-orange-500 hover:bg-orange-600"
               >
-                {loading ? "Saving..." : "Save Changes"}
+                {saving ? "Saving..." : "Save Changes"}
               </Button>
             </form>
           </div>

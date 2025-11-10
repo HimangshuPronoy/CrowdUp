@@ -10,6 +10,8 @@ import { ChevronDown } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { formatDistanceToNow } from "date-fns";
+import { rankPosts } from "@/lib/algorithm";
+import { getCurrentUserId } from "@/lib/auth";
 
 interface Post {
   id: string;
@@ -27,6 +29,27 @@ interface Post {
   };
 }
 
+interface PostWithEngagement extends Post {
+  comments_count?: number;
+  views?: number;
+  shares?: number;
+}
+
+interface AlgorithmPost {
+  id: string;
+  user_id: string;
+  type: string;
+  company: string;
+  company_color: string;
+  title: string;
+  description: string;
+  votes: number;
+  created_at: string;
+  comments_count?: number;
+  views?: number;
+  shares?: number;
+}
+
 export default function Home() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,29 +64,19 @@ export default function Home() {
 
   const fetchPosts = async () => {
     setLoading(true);
-    let query = supabase
+    
+    // Fetch all posts with user data
+    const { data, error } = await supabase
       .from("posts")
       .select(`
         *,
         users (username, display_name)
       `);
 
-    // Apply sorting
-    if (sortBy === "new") {
-      query = query.order("created_at", { ascending: false });
-    } else if (sortBy === "top") {
-      query = query.order("votes", { ascending: false });
-    } else {
-      // Featured: combination of votes and recency
-      query = query.order("votes", { ascending: false }).order("created_at", { ascending: false });
-    }
-
-    const { data, error } = await query;
-
     if (!error && data) {
-      setPosts(data as Post[]);
-      
       // Fetch comment counts for all posts
+      let postsWithEngagement: PostWithEngagement[] = data as PostWithEngagement[];
+      
       if (data.length > 0) {
         const postIds = data.map((p: any) => p.id);
         const { data: commentsData } = await supabase
@@ -77,8 +90,78 @@ export default function Home() {
             counts[comment.post_id] = (counts[comment.post_id] || 0) + 1;
           });
           setCommentCounts(counts);
+          
+          // Add comment counts to posts
+          postsWithEngagement = postsWithEngagement.map(post => ({
+            ...post,
+            comments_count: counts[post.id] || 0
+          }));
         }
       }
+
+      // Apply algorithm-based sorting
+      let sortedPosts: PostWithEngagement[];
+      
+      if (sortBy === "new") {
+        // Simple recency sort
+        sortedPosts = [...postsWithEngagement].sort((a, b) => 
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+      } else if (sortBy === "top") {
+        // Simple vote sort
+        sortedPosts = [...postsWithEngagement].sort((a, b) => b.votes - a.votes);
+      } else {
+        // Featured: Use advanced algorithm
+        const userId = getCurrentUserId();
+        
+        // Get user's voted posts for personalization
+        let votedPosts: string[] = [];
+        if (userId) {
+          const { data: votesData } = await supabase
+            .from("votes")
+            .select("post_id")
+            .eq("user_id", userId);
+          
+          if (votesData) {
+            votedPosts = votesData.map((v: any) => v.post_id);
+          }
+        }
+        
+        // Create user interaction profile
+        const userInteraction = userId ? {
+          userId,
+          followedUsers: [], // TODO: Implement follows
+          interactedCompanies: [], // TODO: Track company interactions
+          preferredTypes: [], // TODO: Track preferred post types
+          votedPosts
+        } : undefined;
+        
+        // Convert to algorithm format and rank
+        const algorithmPosts: AlgorithmPost[] = postsWithEngagement.map(p => ({
+          id: p.id,
+          user_id: p.user_id,
+          type: p.type,
+          company: p.company,
+          company_color: p.company_color,
+          title: p.title,
+          description: p.description,
+          votes: p.votes,
+          created_at: p.created_at,
+          comments_count: p.comments_count,
+          views: p.views,
+          shares: p.shares
+        }));
+        
+        const rankedAlgorithmPosts = rankPosts(algorithmPosts, userInteraction);
+        
+        // Convert back to Post format
+        sortedPosts = rankedAlgorithmPosts.map(ap => {
+          const original = postsWithEngagement.find(p => p.id === ap.id)!;
+          return original;
+        });
+      }
+      
+      setPosts(sortedPosts as Post[]);
     }
     setLoading(false);
   };

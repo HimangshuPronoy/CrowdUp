@@ -1,26 +1,35 @@
 "use client";
 
 import Header from "@/components/Header";
-import { Search } from "lucide-react";
+import { Search, UserPlus, UserCheck, Users as UsersIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import PostCard from "@/components/PostCard";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { useState, useEffect } from "react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useState, useEffect, Suspense } from "react";
 import { supabase } from "@/lib/supabase";
 import { formatDistanceToNow } from "date-fns";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { getCurrentUserId } from "@/lib/auth";
 
 interface SearchResult {
   type: "post" | "user" | "company";
   data: any;
 }
 
-export default function SearchPage() {
+function SearchPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const currentUserId = getCurrentUserId();
   const [searchQuery, setSearchQuery] = useState("");
-  const [results, setResults] = useState<SearchResult[]>([]);
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || "posts");
+  const [posts, setPosts] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
+  const [companies, setCompanies] = useState<any[]>([]);
+  const [suggestedUsers, setSuggestedUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
 
   const categories = [
     { name: "Productivity", icon: "📦", gradient: "from-blue-400 to-cyan-500" },
@@ -37,61 +46,119 @@ export default function SearchPage() {
     if (searchQuery.trim()) {
       performSearch();
     } else {
-      setResults([]);
+      setPosts([]);
+      setUsers([]);
+      setCompanies([]);
     }
   }, [searchQuery]);
+
+  useEffect(() => {
+    if (currentUserId) {
+      fetchFollowingStatus();
+      fetchSuggestedUsers();
+    }
+  }, [currentUserId]);
+
+  const fetchFollowingStatus = async () => {
+    if (!currentUserId) return;
+    
+    const { data } = await supabase
+      .from('connections')
+      .select('following_id')
+      .eq('follower_id', currentUserId);
+    
+    if (data) {
+      setFollowingIds(new Set(data.map(c => c.following_id)));
+    }
+  };
+
+  const fetchSuggestedUsers = async () => {
+    if (!currentUserId) return;
+
+    // Get users who are not followed by current user
+    const { data } = await supabase
+      .from('users')
+      .select('*')
+      .neq('id', currentUserId)
+      .limit(10);
+
+    if (data) {
+      setSuggestedUsers(data);
+    }
+  };
+
+  const handleFollow = async (userId: string) => {
+    if (!currentUserId) return;
+
+    const isFollowing = followingIds.has(userId);
+
+    if (isFollowing) {
+      // Unfollow
+      await supabase
+        .from('connections')
+        .delete()
+        .eq('follower_id', currentUserId)
+        .eq('following_id', userId);
+      
+      setFollowingIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(userId);
+        return newSet;
+      });
+    } else {
+      // Follow
+      await supabase
+        .from('connections')
+        .insert({
+          follower_id: currentUserId,
+          following_id: userId,
+        });
+      
+      setFollowingIds(prev => new Set(prev).add(userId));
+    }
+  };
 
   const performSearch = async () => {
     setLoading(true);
     const query = searchQuery.toLowerCase().trim();
-    const allResults: SearchResult[] = [];
 
     // Search posts
-    const { data: posts } = await supabase
+    const { data: postsData } = await supabase
       .from("posts")
       .select(`
         *,
         users (username, display_name)
       `)
       .or(`title.ilike.%${query}%,description.ilike.%${query}%,company.ilike.%${query}%`)
-      .limit(10);
+      .order('created_at', { ascending: false })
+      .limit(20);
 
-    if (posts) {
-      posts.forEach((post: any) => {
-        allResults.push({ type: "post", data: post });
-      });
-    }
+    setPosts(postsData || []);
 
     // Search users
-    const { data: users } = await supabase
+    const { data: usersData } = await supabase
       .from("users")
       .select("*")
-      .or(`username.ilike.%${query}%,display_name.ilike.%${query}%`)
-      .limit(5);
+      .or(`username.ilike.%${query}%,display_name.ilike.%${query}%,bio.ilike.%${query}%`)
+      .neq('id', currentUserId || '')
+      .limit(20);
 
-    if (users) {
-      users.forEach((user: any) => {
-        allResults.push({ type: "user", data: user });
-      });
-    }
+    setUsers(usersData || []);
 
     // Get unique companies from posts
-    const { data: companies } = await supabase
+    const { data: companiesData } = await supabase
       .from("posts")
       .select("company, company_color")
       .ilike("company", `%${query}%`)
-      .limit(5);
+      .limit(20);
 
-    if (companies) {
+    if (companiesData) {
       const uniqueCompanies = Array.from(
-        new Map(companies.map((c: any) => [c.company, c])).values()
+        new Map(companiesData.map((c: any) => [c.company, c])).values()
       );
-      uniqueCompanies.forEach((company: any) => {
-        allResults.push({ type: "company", data: company });
-      });
+      setCompanies(uniqueCompanies);
     }
 
-    setResults(allResults);
     setLoading(false);
   };
 
@@ -117,27 +184,29 @@ export default function SearchPage() {
           />
         </div>
 
-        {/* Results */}
-        {loading && (
-          <div className="text-center py-12">
-            <p className="text-gray-600">Searching...</p>
-          </div>
-        )}
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-8">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="posts">Posts</TabsTrigger>
+            <TabsTrigger value="users">Users</TabsTrigger>
+            <TabsTrigger value="companies">Companies</TabsTrigger>
+          </TabsList>
 
-        {!loading && searchQuery && results.length === 0 && (
-          <div className="text-center py-12 bg-white rounded-2xl border">
-            <p className="text-gray-600">No results found for "{searchQuery}"</p>
-          </div>
-        )}
-
-        {!loading && results.length > 0 && (
-          <div className="space-y-6">
-            {results.map((result, index) => {
-              if (result.type === "post") {
-                const post = result.data;
-                return (
+          {/* Posts Tab */}
+          <TabsContent value="posts" className="mt-6">
+            {loading ? (
+              <div className="text-center py-12">
+                <p className="text-gray-600">Searching posts...</p>
+              </div>
+            ) : searchQuery && posts.length === 0 ? (
+              <div className="text-center py-12 bg-white rounded-2xl border">
+                <p className="text-gray-600">No posts found for "{searchQuery}"</p>
+              </div>
+            ) : posts.length > 0 ? (
+              <div className="space-y-4">
+                {posts.map((post: any) => (
                   <PostCard
-                    key={`post-${index}`}
+                    key={post.id}
                     postId={post.id}
                     type={post.type}
                     company={post.company}
@@ -152,40 +221,99 @@ export default function SearchPage() {
                     })}
                     comments={0}
                   />
-                );
-              }
+                ))}
+              </div>
+            ) : null}
+          </TabsContent>
 
-              if (result.type === "user") {
-                const user = result.data;
-                return (
-                  <button
-                    key={`user-${index}`}
-                    onClick={() => router.push(`/profile/${user.username}`)}
-                    className="w-full rounded-2xl border bg-white p-6 shadow-sm hover:shadow-md transition-all text-left"
-                  >
-                    <div className="flex items-center gap-4">
-                      <Avatar className="h-16 w-16 bg-gradient-to-br from-yellow-400 to-orange-500">
-                        <AvatarFallback className="bg-gradient-to-br from-yellow-400 to-orange-500 text-white text-xl font-bold">
-                          {user.display_name.charAt(0).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <h3 className="text-lg font-bold">{user.display_name}</h3>
-                        <p className="text-sm text-gray-600">@{user.username}</p>
-                        {user.bio && (
-                          <p className="text-sm text-gray-500 mt-1">{user.bio}</p>
+          {/* Users Tab */}
+          <TabsContent value="users" className="mt-6">
+            {loading ? (
+              <div className="text-center py-12">
+                <p className="text-gray-600">Searching users...</p>
+              </div>
+            ) : searchQuery && users.length === 0 ? (
+              <div className="text-center py-12 bg-white rounded-2xl border">
+                <p className="text-gray-600">No users found for "{searchQuery}"</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {(searchQuery ? users : suggestedUsers).map((user: any) => {
+                  const isFollowing = followingIds.has(user.id);
+                  return (
+                    <div
+                      key={user.id}
+                      className="rounded-2xl border bg-white p-6 shadow-sm hover:shadow-md transition-all"
+                    >
+                      <div className="flex items-center gap-4">
+                        <button onClick={() => router.push(`/profile/${user.username}`)}>
+                          <Avatar className="h-16 w-16 bg-gradient-to-br from-yellow-400 to-orange-500">
+                            {user.avatar_url ? (
+                              <img src={user.avatar_url} alt={user.display_name} className="h-full w-full object-cover" />
+                            ) : (
+                              <AvatarFallback className="bg-gradient-to-br from-yellow-400 to-orange-500 text-white text-xl font-bold">
+                                {user.display_name.charAt(0).toUpperCase()}
+                              </AvatarFallback>
+                            )}
+                          </Avatar>
+                        </button>
+                        <div className="flex-1">
+                          <button onClick={() => router.push(`/profile/${user.username}`)} className="text-left">
+                            <h3 className="text-lg font-bold hover:underline">{user.display_name}</h3>
+                            <p className="text-sm text-gray-600">@{user.username}</p>
+                            {user.bio && (
+                              <p className="text-sm text-gray-500 mt-1 line-clamp-2">{user.bio}</p>
+                            )}
+                          </button>
+                        </div>
+                        {currentUserId && (
+                          <Button
+                            onClick={() => handleFollow(user.id)}
+                            variant={isFollowing ? "outline" : "default"}
+                            className={isFollowing ? "" : "bg-gradient-to-br from-yellow-400 to-orange-500"}
+                          >
+                            {isFollowing ? (
+                              <>
+                                <UserCheck className="h-4 w-4 mr-2" />
+                                Following
+                              </>
+                            ) : (
+                              <>
+                                <UserPlus className="h-4 w-4 mr-2" />
+                                Follow
+                              </>
+                            )}
+                          </Button>
                         )}
                       </div>
                     </div>
-                  </button>
-                );
-              }
+                  );
+                })}
+                {!searchQuery && suggestedUsers.length === 0 && (
+                  <div className="text-center py-12 bg-white rounded-2xl border">
+                    <UsersIcon className="h-16 w-16 mx-auto mb-4 text-gray-400" />
+                    <p className="text-gray-600">No users to suggest</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </TabsContent>
 
-              if (result.type === "company") {
-                const company = result.data;
-                return (
+          {/* Companies Tab */}
+          <TabsContent value="companies" className="mt-6">
+            {loading ? (
+              <div className="text-center py-12">
+                <p className="text-gray-600">Searching companies...</p>
+              </div>
+            ) : searchQuery && companies.length === 0 ? (
+              <div className="text-center py-12 bg-white rounded-2xl border">
+                <p className="text-gray-600">No companies found for "{searchQuery}"</p>
+              </div>
+            ) : companies.length > 0 ? (
+              <div className="space-y-4">
+                {companies.map((company: any, index: number) => (
                   <button
-                    key={`company-${index}`}
+                    key={index}
                     onClick={() => router.push(`/company/${company.company.toLowerCase()}`)}
                     className="w-full rounded-2xl border bg-white p-6 shadow-sm hover:shadow-md transition-all text-left"
                   >
@@ -202,13 +330,11 @@ export default function SearchPage() {
                       </div>
                     </div>
                   </button>
-                );
-              }
-
-              return null;
-            })}
-          </div>
-        )}
+                ))}
+              </div>
+            ) : null}
+          </TabsContent>
+        </Tabs>
 
         {!searchQuery && (
           <>
@@ -239,5 +365,22 @@ export default function SearchPage() {
         )}
       </main>
     </div>
+  );
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50">
+        <Header />
+        <main className="mx-auto max-w-4xl px-6 pt-24 pb-8">
+          <div className="text-center py-12">
+            <p className="text-gray-600">Loading...</p>
+          </div>
+        </main>
+      </div>
+    }>
+      <SearchPageContent />
+    </Suspense>
   );
 }

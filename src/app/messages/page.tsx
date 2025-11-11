@@ -159,9 +159,20 @@ export default function MessagesPage() {
                       </DialogHeader>
                       <div className="space-y-2 max-h-96 overflow-y-auto">
                         {connections.length === 0 ? (
-                          <p className="text-center text-gray-500 py-8">
-                            No connections yet. Follow users to connect!
-                          </p>
+                          <div className="text-center text-gray-500 py-8">
+                            <MessageCircle className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                            <p className="font-medium mb-2">No connections yet</p>
+                            <p className="text-sm mb-4">Connect with users to start chatting</p>
+                            <Button
+                              onClick={() => {
+                                setNewChatDialogOpen(false);
+                                router.push("/search?tab=users");
+                              }}
+                              className="bg-gradient-to-br from-yellow-400 to-orange-500"
+                            >
+                              Find Users
+                            </Button>
+                          </div>
                         ) : (
                           connections.map((conn) => (
                             <button

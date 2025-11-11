@@ -5,7 +5,15 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { ChevronUp, ChevronDown, Share2, Flag, Send } from "lucide-react";
+import { ChevronUp, ChevronDown, Share2, Flag, Send, Users } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { use, useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
@@ -52,11 +60,14 @@ export default function PostDetailPage({ params }: { params: Promise<{ id: strin
   const [commentText, setCommentText] = useState("");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [upvoters, setUpvoters] = useState<any[]>([]);
+  const [upvotersDialogOpen, setUpvotersDialogOpen] = useState(false);
 
   useEffect(() => {
     fetchPost();
     fetchComments();
     fetchUserVote();
+    fetchUpvoters();
   }, [id]);
 
   const fetchPost = async () => {
@@ -88,6 +99,22 @@ export default function PostDetailPage({ params }: { params: Promise<{ id: strin
 
     if (!error && data) {
       setComments(data as Comment[]);
+    }
+  };
+
+  const fetchUpvoters = async () => {
+    const { data } = await supabase
+      .from("votes")
+      .select(`
+        vote_type,
+        users (username, display_name, avatar_url)
+      `)
+      .eq("post_id", id)
+      .eq("vote_type", "up")
+      .order("created_at", { ascending: false });
+
+    if (data) {
+      setUpvoters(data);
     }
   };
 
@@ -266,13 +293,55 @@ export default function PostDetailPage({ params }: { params: Promise<{ id: strin
               >
                 <ChevronUp className="h-6 w-6" />
               </Button>
-              <span className={cn(
-                "text-2xl font-bold",
-                userVote === "up" && "text-green-600",
-                userVote === "down" && "text-red-600"
-              )}>
-                {votes}
-              </span>
+              <Dialog open={upvotersDialogOpen} onOpenChange={setUpvotersDialogOpen}>
+                <DialogTrigger asChild>
+                  <button className={cn(
+                    "text-2xl font-bold hover:underline cursor-pointer",
+                    userVote === "up" && "text-green-600",
+                    userVote === "down" && "text-red-600"
+                  )}>
+                    {votes}
+                  </button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[500px] max-h-[600px] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Upvoted by {upvoters.length} {upvoters.length === 1 ? 'person' : 'people'}</DialogTitle>
+                    <DialogDescription>
+                      People who upvoted this post
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-3 py-4">
+                    {upvoters.length === 0 ? (
+                      <p className="text-center text-gray-500 py-8">No upvotes yet</p>
+                    ) : (
+                      upvoters.map((vote: any, index: number) => (
+                        <button
+                          key={index}
+                          onClick={() => {
+                            setUpvotersDialogOpen(false);
+                            router.push(`/profile/${vote.users.username}`);
+                          }}
+                          className="w-full p-3 flex items-center gap-3 hover:bg-gray-50 rounded-lg transition-colors"
+                        >
+                          <Avatar className="h-10 w-10 bg-gradient-to-br from-yellow-400 to-orange-500">
+                            {vote.users.avatar_url ? (
+                              <img src={vote.users.avatar_url} alt={vote.users.display_name} className="h-full w-full object-cover" />
+                            ) : (
+                              <AvatarFallback className="bg-gradient-to-br from-yellow-400 to-orange-500 text-white font-semibold">
+                                {vote.users.display_name.charAt(0).toUpperCase()}
+                              </AvatarFallback>
+                            )}
+                          </Avatar>
+                          <div className="text-left">
+                            <p className="font-semibold">{vote.users.display_name}</p>
+                            <p className="text-sm text-gray-500">@{vote.users.username}</p>
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </DialogContent>
+              </Dialog>
               <Button
                 variant="ghost"
                 size="icon"

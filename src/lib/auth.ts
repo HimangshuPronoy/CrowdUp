@@ -137,3 +137,90 @@ export function getCurrentUserId(): string | null {
   if (typeof window === 'undefined') return null;
   return localStorage.getItem('userId');
 }
+
+export async function changePassword(currentPassword: string, newPassword: string): Promise<{ success: boolean; error: string | null }> {
+  try {
+    const userId = getCurrentUserId();
+    if (!userId) {
+      return { success: false, error: 'Not authenticated' };
+    }
+
+    // Get user with password hash
+    const { data: user, error: fetchError } = await supabase
+      .from('users')
+      .select('password_hash')
+      .eq('id', userId)
+      .single();
+
+    if (fetchError || !user) {
+      return { success: false, error: 'User not found' };
+    }
+
+    // Verify current password
+    const isValid = await bcrypt.compare(currentPassword, user.password_hash);
+    if (!isValid) {
+      return { success: false, error: 'Current password is incorrect' };
+    }
+
+    // Hash new password
+    const newPasswordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+
+    // Update password
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({ password_hash: newPasswordHash })
+      .eq('id', userId);
+
+    if (updateError) {
+      return { success: false, error: 'Failed to update password' };
+    }
+
+    return { success: true, error: null };
+  } catch (error) {
+    return { success: false, error: 'An error occurred while changing password' };
+  }
+}
+
+export async function updateProfile(data: { display_name?: string; username?: string; bio?: string }): Promise<{ success: boolean; error: string | null }> {
+  try {
+    const userId = getCurrentUserId();
+    if (!userId) {
+      return { success: false, error: 'Not authenticated' };
+    }
+
+    // If username is being changed, check if it's available
+    if (data.username) {
+      const { data: existingUser } = await supabase
+        .from('users')
+        .select('id')
+        .eq('username', data.username)
+        .neq('id', userId)
+        .single();
+
+      if (existingUser) {
+        return { success: false, error: 'Username already taken' };
+      }
+    }
+
+    // Update user
+    const { error: updateError } = await supabase
+      .from('users')
+      .update(data)
+      .eq('id', userId);
+
+    if (updateError) {
+      return { success: false, error: 'Failed to update profile' };
+    }
+
+    // Update local storage
+    const currentUser = getCurrentUser();
+    if (currentUser) {
+      const updatedUser = { ...currentUser, ...data };
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+    }
+
+    return { success: true, error: null };
+  } catch (error) {
+    return { success: false, error: 'An error occurred while updating profile' };
+  }
+}

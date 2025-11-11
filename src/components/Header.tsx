@@ -1,12 +1,13 @@
 "use client";
 
-import { Home, Search, Plus, MessageCircle, User, Bell, ChevronDown } from "lucide-react";
+import { Home, Search, Plus, MessageCircle, User, Bell, ChevronDown, Building2, Smartphone } from "lucide-react";
 import { Button } from "./ui/button";
 import { Avatar, AvatarFallback } from "./ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import { useRouter, usePathname } from "next/navigation";
@@ -139,15 +140,30 @@ export default function Header() {
         <div className="flex items-center gap-3">
           {/* Notification Bell - Far Right */}
           {user && (
-            <div className="relative">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="rounded-xl transition-all hover:scale-105 hover:bg-gray-100 h-10 w-10"
-              >
-                <Bell className="h-5 w-5" />
-              </Button>
-            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="rounded-xl transition-all hover:scale-105 hover:bg-gray-100 h-10 w-10 relative"
+                >
+                  <Bell className="h-5 w-5" />
+                  {/* Notification badge */}
+                  <span className="absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-80">
+                <div className="px-4 py-3 border-b">
+                  <h3 className="font-semibold">Notifications</h3>
+                </div>
+                <div className="max-h-96 overflow-y-auto">
+                  <div className="p-4 text-center text-gray-500 text-sm">
+                    No new notifications
+                  </div>
+                  {/* Placeholder for future notifications */}
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
 
           {user ? (
@@ -166,13 +182,25 @@ export default function Header() {
                   <ChevronDown className="h-4 w-4 text-gray-500" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuItem onClick={() => router.push(`/profile/${user.username}`)}>
+                  <User className="h-4 w-4 mr-2" />
                   Profile
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => router.push("/settings")}>
+                  <Bell className="h-4 w-4 mr-2" />
                   Settings
                 </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => router.push("/company/create")}>
+                  <Building2 className="h-4 w-4 mr-2" />
+                  Create Company Page
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push("/apps/create")}>
+                  <Smartphone className="h-4 w-4 mr-2" />
+                  Create App Page
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem className="text-red-600" onClick={handleSignOut}>
                   Logout
                 </DropdownMenuItem>

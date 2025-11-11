@@ -288,6 +288,55 @@ export interface Database {
           created_at?: string
         }
       }
+      conversations: {
+        Row: {
+          id: string
+          participant1_id: string
+          participant2_id: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          participant1_id: string
+          participant2_id: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          participant1_id?: string
+          participant2_id?: string
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      messages: {
+        Row: {
+          id: string
+          conversation_id: string
+          sender_id: string
+          content: string
+          read: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          conversation_id: string
+          sender_id: string
+          content: string
+          read?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          conversation_id?: string
+          sender_id?: string
+          content?: string
+          read?: boolean
+          created_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never

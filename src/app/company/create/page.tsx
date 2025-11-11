@@ -16,7 +16,8 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { getCurrentUserId } from "@/lib/auth";
-import { Building2, Send } from "lucide-react";
+import { compressAndUploadImage } from "@/lib/imageUpload";
+import { Building2, Send, Upload } from "lucide-react";
 
 export default function CreateCompanyPage() {
   const router = useRouter();
@@ -30,6 +31,7 @@ export default function CreateCompanyPage() {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   useEffect(() => {
     const userId = getCurrentUserId();
@@ -222,22 +224,66 @@ export default function CreateCompanyPage() {
               />
             </div>
 
-            {/* Logo URL */}
+            {/* Logo Upload */}
             <div>
-              <Label htmlFor="logo_url" className="text-base font-semibold mb-2 block">
-                Logo URL (Optional)
+              <Label className="text-base font-semibold mb-2 block">
+                Company Logo (Optional)
               </Label>
-              <Input
-                id="logo_url"
-                type="url"
-                placeholder="https://example.com/logo.png"
-                value={formData.logo_url}
-                onChange={(e) => setFormData({ ...formData, logo_url: e.target.value })}
-                className="h-12"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Provide a direct link to your company logo (recommended: 200x200px)
-              </p>
+              <div className="flex items-center gap-4">
+                {formData.logo_url && (
+                  <img
+                    src={formData.logo_url}
+                    alt="Logo preview"
+                    className="h-20 w-20 rounded-lg object-cover border-2 border-gray-200"
+                  />
+                )}
+                <div className="flex-1">
+                  <input
+                    type="file"
+                    id="logo-upload"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+
+                      setUploadingLogo(true);
+                      const result = await compressAndUploadImage(file, 300, 300, 0.85);
+                      
+                      if (result.success && result.dataUrl) {
+                        setFormData({ ...formData, logo_url: result.dataUrl });
+                      } else {
+                        setError(result.error || "Failed to upload logo");
+                      }
+                      setUploadingLogo(false);
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => document.getElementById("logo-upload")?.click()}
+                    disabled={uploadingLogo}
+                    className="w-full gap-2"
+                  >
+                    <Upload className="h-4 w-4" />
+                    {uploadingLogo ? "Uploading..." : "Upload Logo"}
+                  </Button>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Upload an image (max 300x300px, compressed automatically)
+                  </p>
+                  {formData.logo_url && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setFormData({ ...formData, logo_url: "" })}
+                      className="text-xs mt-2"
+                    >
+                      Remove Logo
+                    </Button>
+                  )}
+                </div>
+              </div>
             </div>
 
             {/* Preview */}

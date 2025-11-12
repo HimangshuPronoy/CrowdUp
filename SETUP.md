@@ -18,6 +18,7 @@
 2. Copy the contents of `supabase-schema.sql` from this project
 3. Paste and run the SQL in the Supabase SQL Editor
 4. This will create all necessary tables, indexes, and security policies
+5. (Optional) If you want Google Sign-In, also run `migration-google-oauth.sql` to add OAuth support
 
 ### 3. Configure Environment Variables
 
@@ -31,11 +32,23 @@
    - Copy the Project URL
    - Copy the `anon` public key
 
-3. Update `.env.local`:
+3. Update `.env.local` with required values:
    ```
    NEXT_PUBLIC_SUPABASE_URL=your_project_url
    NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
    ```
+
+4. (Optional) Set up Google OAuth for "Sign in with Google":
+   - Go to [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+   - Create a new OAuth 2.0 Client ID (or use existing)
+   - Add authorized redirect URI: `http://localhost:3000/api/auth/callback/google`
+   - For production, also add: `https://yourdomain.com/api/auth/callback/google`
+   - Copy the Client ID and Client Secret
+   - Add to `.env.local`:
+     ```
+     NEXT_PUBLIC_GOOGLE_CLIENT_ID=your_client_id.apps.googleusercontent.com
+     GOOGLE_CLIENT_SECRET=your_client_secret
+     ```
 
 ### 4. Install Dependencies
 
@@ -65,6 +78,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 ## Features
 
 - ✅ Custom authentication (username/email + password)
+- ✅ Google Sign-In (OAuth 2.0)
 - ✅ Create posts (Bug Reports, Feature Requests, Complaints)
 - ✅ Upvote/downvote system
 - ✅ User profiles

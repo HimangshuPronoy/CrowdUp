@@ -5,6 +5,7 @@ A social feedback platform where users can submit and vote on bug reports, featu
 ## Features
 
 - 🔐 Custom authentication (username/email + password)
+- 🔑 Google Sign-In (OAuth 2.0)
 - 📝 Create posts (Bug Reports, Feature Requests, Complaints)
 - ⬆️ Upvote/downvote system with real-time updates
 - 👤 User profiles with post history

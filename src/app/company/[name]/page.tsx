@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import PostCard from "@/components/PostCard";
-import { ExternalLink, Edit2, BarChart3, Upload } from "lucide-react";
+import { ExternalLink, Edit2, BarChart3, Upload, Heart } from "lucide-react";
 import { use, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -59,6 +59,9 @@ export default function CompanyPage({ params }: { params: Promise<{ name: string
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState("");
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followerCount, setFollowerCount] = useState(0);
+  const [followLoading, setFollowLoading] = useState(false);
 
   useEffect(() => {
     fetchCompany();
@@ -69,6 +72,7 @@ export default function CompanyPage({ params }: { params: Promise<{ name: string
     if (company) {
       fetchApps();
       checkOwnership();
+      checkFollowStatus();
       setEditFormData({
         display_name: company.display_name,
         description: company.description || "",
@@ -153,6 +157,65 @@ export default function CompanyPage({ params }: { params: Promise<{ name: string
     }
   };
 
+  const checkFollowStatus = async () => {
+    const userId = getCurrentUserId();
+    if (!userId || !company) return;
+
+    const { data } = await supabase
+      .from("company_follows")
+      .select("id")
+      .eq("company_id", company.id)
+      .eq("user_id", userId)
+      .single();
+
+    setIsFollowing(!!data);
+
+    // Get follower count
+    const { count } = await supabase
+      .from("company_follows")
+      .select("*", { count: "exact", head: true })
+      .eq("company_id", company.id);
+
+    setFollowerCount(count || 0);
+  };
+
+  const handleFollow = async () => {
+    const userId = getCurrentUserId();
+    if (!userId) {
+      router.push("/auth/signin");
+      return;
+    }
+
+    if (!company) return;
+
+    setFollowLoading(true);
+
+    if (isFollowing) {
+      // Unfollow
+      await supabase
+        .from("company_follows")
+        .delete()
+        .eq("company_id", company.id)
+        .eq("user_id", userId);
+
+      setIsFollowing(false);
+      setFollowerCount(prev => Math.max(0, prev - 1));
+    } else {
+      // Follow
+      await supabase
+        .from("company_follows")
+        .insert({
+          company_id: company.id,
+          user_id: userId,
+        });
+
+      setIsFollowing(true);
+      setFollowerCount(prev => prev + 1);
+    }
+
+    setFollowLoading(false);
+  };
+
   const handleEditCompany = async () => {
     setEditError("");
     setEditLoading(true);
@@ -225,6 +288,13 @@ export default function CompanyPage({ params }: { params: Promise<{ name: string
                 <h1 className="text-3xl font-bold">{displayName}</h1>
                 {isOwnerOrAdmin && (
                   <div className="flex gap-2">
+                    <Button
+                      onClick={() => router.push(`/company/${name}/manage`)}
+                      className="gap-2 bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600"
+                    >
+                      <Edit2 className="h-4 w-4" />
+                      Manage Company
+                    </Button>
                     <Button
                       onClick={() => router.push(`/company/${name}/analytics`)}
                       variant="outline"
@@ -401,16 +471,32 @@ export default function CompanyPage({ params }: { params: Promise<{ name: string
                   {company.category}
                 </span>
               )}
-              {company?.website && (
-                <Button
-                  onClick={() => window.open(company.website!, "_blank")}
-                  variant="outline"
-                  className="gap-2"
-                >
-                  <ExternalLink className="h-4 w-4" />
-                  Visit Website
-                </Button>
-              )}
+              <div className="flex items-center gap-3">
+                {company?.website && (
+                  <Button
+                    onClick={() => window.open(company.website!, "_blank")}
+                    variant="outline"
+                    className="gap-2"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    Visit Website
+                  </Button>
+                )}
+                {!isOwnerOrAdmin && (
+                  <Button
+                    onClick={handleFollow}
+                    disabled={followLoading}
+                    className={isFollowing ? "gap-2" : "gap-2 bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600"}
+                    variant={isFollowing ? "outline" : "default"}
+                  >
+                    <Heart className={`h-4 w-4 ${isFollowing ? 'fill-current' : ''}`} />
+                    {isFollowing ? "Following" : "Follow"}
+                    {followerCount > 0 && (
+                      <span className="ml-1">({followerCount})</span>
+                    )}
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         </div>
